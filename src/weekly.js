@@ -91,8 +91,17 @@ export function weeklyInfo(doc, sourceName = '') {
   }
   const slug = String(doc.meta.slug || sourceName.replace(/\.[^.]+$/, '') || '').trim();
   const explicit = doc.meta.weekly_url || doc.meta.url;
-  const url = typeof explicit === 'string' && /^https?:\/\//.test(explicit) ? explicit
-    : `http://jpa.guramod.club/lyrics/${slug && !/[\\/#?]/.test(slug) ? encodeURIComponent(slug) + '/' : ''}`;
+  let url = typeof explicit === 'string' && /^https?:\/\//.test(explicit) ? explicit
+    : `https://hitszjla.club/lyrics/${slug && !/[\\/#?]/.test(slug) ? encodeURIComponent(slug) + '/' : ''}`;
+  // Older Markdown may still supply the former site in weekly_url or url.
+  // Keep its song path while migrating the generated PDF to the current site.
+  const parsedUrl = new URL(url);
+  if (['jpa.guramod.club', 'hitszjla.club'].includes(parsedUrl.hostname)) {
+    parsedUrl.protocol = 'https:';
+    parsedUrl.hostname = 'hitszjla.club';
+    parsedUrl.port = '';
+    url = parsedUrl.href;
+  }
   return { title, shortTitle: title.replace(/\s+-\s+/g, ' / '), cover, credits, blocks, url };
 }
 

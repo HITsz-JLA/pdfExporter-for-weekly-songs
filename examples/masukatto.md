@@ -3,7 +3,7 @@ title: "マスカット - 平原綾香"
 date: 2026-10-15
 draft: false
 type: lyrics
-weekly_url: "http://jpa.guramod.club/lyrics/masukatto/"
+weekly_url: "https://hitszjla.club/lyrics/masukatto/"
 ---
 
 ![专辑封面](/image/Masukatto.jpg)
