@@ -20,9 +20,10 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '35mb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true, browser: browserPath() ? '已找到本机浏览器' : '使用 Playwright Chromium（需要先安装）' }));
 app.get('/api/fonts', async (req, res) => {
-  const fonts = await getFonts(req.query.refresh === '1');
-  res.json({ fonts: [...fonts.values()].map(publicFont).sort((a, b) => a.family.localeCompare(b.family, 'zh-CN')),
-    note: '扫描服务所在电脑的系统字体和当前用户字体。' });
+  const fonts = await getFonts(true);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ fonts: [...fonts.values()].map(publicFont).sort((a, b) => a.displayFamily.localeCompare(b.displayFamily, 'zh-CN')),
+    note: '已重新扫描服务电脑的系统字体和当前用户字体。优先显示本地名称，中英文名称均可搜索。' });
 });
 app.get('/api/font/:id', async (req, res) => {
   const font = (await getFonts()).get(req.params.id);
@@ -41,11 +42,14 @@ async function prepare(body, origin) {
   }
   const options = settings(body.options);
   const fonts = await getFonts();
-  const selected = { zh: fonts.get(options.zhFontId), ja: fonts.get(options.jaFontId) };
-  if ((options.zhFontId && !selected.zh) || (options.jaFontId && !selected.ja)) { const error = new Error('所选字体已不存在，请刷新字体列表。'); error.status = 400; throw error; }
-  const faces = Object.fromEntries(['zh', 'ja'].map(lang => [lang, selected[lang] ? [...fonts.values()].filter(f => f.family === selected[lang].family) : []]));
+  const selected = { zh: fonts.get(options.zhFontId), ja: fonts.get(options.jaFontId), header: fonts.get(options.headerFontId || options.zhFontId) };
+  if ((options.zhFontId && !selected.zh) || (options.jaFontId && !selected.ja) || (options.headerFontId && !selected.header)) { const error = new Error('所选字体已不存在，请刷新字体列表。'); error.status = 400; throw error; }
+  const faces = Object.fromEntries(['zh', 'ja', 'header'].map(lang => [lang, selected[lang] ? [...fonts.values()].filter(f => f.family === selected[lang].family) : []]));
+  // Chromium's native header uses installed font families, independently of the document CSS.
+  options.headerFontFamily = selected.header?.family || 'Microsoft YaHei';
   if (body.coverImage !== undefined && typeof body.coverImage !== 'string') { const error = new Error('头图格式不正确。'); error.status = 400; throw error; }
-  const doc = parseDocument(body.markdown, body.assets || {}, { coverImage: body.coverImage || '' });
+  if (body.watermarkImage !== undefined && typeof body.watermarkImage !== 'string') { const error = new Error('水印图片格式不正确。'); error.status = 400; throw error; }
+  const doc = parseDocument(body.markdown, body.assets || {}, { coverImage: body.coverImage || '', watermarkImage: body.watermarkImage || '' });
   return { doc, options, selected, html: buildHtml(doc, options, faces, origin) };
 }
 app.post('/api/preview', async (req, res) => {
@@ -54,11 +58,13 @@ app.post('/api/preview', async (req, res) => {
 });
 app.post('/api/coverage', async (req, res) => {
   const result = await prepare(req.body, '');
-  if (!result.selected.zh && !result.selected.ja) return res.status(400).json({ error: '请先选择中文或日文字体。' });
+  if (!result.selected.zh && !result.selected.ja && !(result.options.headerEnabled && result.selected.header)) return res.status(400).json({ error: '请先选择中文、日文或页眉字体。' });
   const languages = {};
   for (const lang of ['zh', 'ja']) {
-    languages[lang] = result.selected[lang] ? { font: result.selected[lang].name, ...await coverage(result.selected[lang], result.doc.textByLanguage[lang]) } : { skipped: true };
+    languages[lang] = result.selected[lang] ? { font: result.selected[lang].displayName || result.selected[lang].name, ...await coverage(result.selected[lang], result.doc.textByLanguage[lang]) } : { skipped: true };
   }
+  if (result.options.headerEnabled && result.options.headerText.trim()) languages.header = result.selected.header
+    ? { font: result.selected.header.displayName || result.selected.header.name, ...await coverage(result.selected.header, result.options.headerText) } : { skipped: true };
   // Keep the original aggregate fields for callers using the old single-font API.
   res.json({ languages, total: Object.values(languages).reduce((n, r) => n + (r.total || 0), 0),
     missingCount: Object.values(languages).reduce((n, r) => n + (r.missingCount || 0), 0), missing: [...new Set(Object.values(languages).flatMap(r => r.missing || []))].slice(0, 150) });

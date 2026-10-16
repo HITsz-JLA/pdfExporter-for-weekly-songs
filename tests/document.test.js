@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDocument, buildHtml, settings } from '../src/document.js';
+import { parseDocument, buildHtml, pageMargins, settings } from '../src/document.js';
 
 test('YAML、center 内 Markdown 和 ruby 注音同时保留', () => {
   const doc = parseDocument('---\ntitle: 测试\ntype: lyrics\n---\n\n<center style="font-family: Yu Gothic; text-align: center">\n\n## 标题\n\n**<ruby>春<rt>はる</rt></ruby>**\n\n中文歌词\n\n</center>');
@@ -81,4 +81,37 @@ test('数字设置限制范围；字体覆盖和纸张设置生效', () => {
   const html = buildHtml(parseDocument('# Test'), { paper: 'A5', margin: 20 });
   assert.match(html, /@page\{size:A5;margin:20mm\}/);
   assert.match(html, /font-family:.*!important/);
+});
+test('页眉和水印受纸张边界及字号限制，文字按纯文本转义', () => {
+  const opts = settings({ paper: 'A5', headerEnabled: true, headerText: '<script>alert(1)</script>\n学习笔记',
+    headerX: 999, headerY: -1, headerFontSize: 999, headerColor: 'red; display:none',
+    watermarkX: 999, watermarkY: -5, watermarkWidth: 999, watermarkOpacity: 150 });
+  assert.equal(opts.headerX, 148); assert.equal(opts.headerY, 0); assert.equal(opts.headerFontSize, 48);
+  assert.equal(opts.headerColor, '#69776e'); assert.equal(opts.watermarkX, 148); assert.equal(opts.watermarkY, 0);
+  assert.equal(opts.watermarkWidth, 148); assert.equal(opts.watermarkOpacity, 100);
+  const doc = parseDocument('正文', {}, { watermarkImage: 'data:image/png;base64,iVBORw0KGgo=' });
+  const html = buildHtml(doc, opts);
+  assert.match(html, /class="page-header-text">&lt;script&gt;/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /class="page-watermark"/);
+  assert.match(html, /\.page-overlay\{display:none\}/);
+  assert.match(html, /width:148mm;height:auto/);
+});
+test('页眉与水印可以分别关闭；不影响原有头图', () => {
+  const image = 'data:image/png;base64,iVBORw0KGgo=';
+  const doc = parseDocument('正文', {}, { coverImage: image, watermarkImage: image });
+  const html = buildHtml(doc, { headerText: '隐藏页眉', headerEnabled: false, watermarkEnabled: false });
+  assert.doesNotMatch(html, /class="page-header-text"|class="page-watermark"/);
+  assert.match(html, /class="cover-image"/);
+  assert.throws(() => parseDocument('test', {}, { watermarkImage: 'file:///local.png' }), /水印必须/);
+});
+test('仅在有页眉文字时增加上边距，预览与打印使用同一留白', () => {
+  assert.equal(pageMargins({}).top, 18);
+  assert.equal(pageMargins({ headerEnabled: true, headerText: '' }).top, 18);
+  assert.equal(pageMargins({ headerEnabled: true, headerText: '页眉' }).top, 28);
+  assert.equal(pageMargins({ headerEnabled: true, headerText: '页眉', headerExtraTop: 16 }).top, 34);
+  assert.equal(pageMargins({ headerEnabled: true, headerText: '页眉' }).bottom, 18);
+  const html = buildHtml(parseDocument('正文'), { headerEnabled: true, headerText: '页眉' });
+  assert.match(html, /@page\{size:A4;margin:28mm 18mm 18mm 18mm\}/);
+  assert.match(html, /padding:28mm 18mm 18mm 18mm/);
 });

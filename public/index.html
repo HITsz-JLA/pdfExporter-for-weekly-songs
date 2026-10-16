@@ -32,14 +32,14 @@
     </section>
     <section class="preview-panel" aria-label="排版预览">
       <div class="preview-toolbar"><div><span class="status-dot"></span><strong>排版预览</strong><span id="paper-label">A4 · 210 × 297 mm</span></div><button id="refresh" class="text-button">刷新预览 ↻</button></div>
-      <div class="preview-note">预览为连续纸张；PDF 会按所选纸张自动分页。</div>
+      <div class="preview-note">连续预览仅展示首页页眉 / 水印位置；PDF 自动分页并在每页重复。</div>
       <div class="preview-scroll"><iframe id="preview" title="Markdown 排版预览" sandbox="allow-same-origin"></iframe></div>
       <div id="status" class="status" role="status" aria-live="polite">正在准备排版引擎…</div>
     </section>
     <aside class="settings-panel" aria-label="导出设置">
       <div class="panel-heading"><h2>排版设置</h2><span class="settings-icon">☷</span></div>
       <section class="setting-group"><h3><span>01</span> 字体</h3>
-        <label for="font-search">查找本机字体</label><input id="font-search" type="search" placeholder="搜索字体名称…">
+        <label for="font-search">查找本机字体</label><input id="font-search" type="search" placeholder="中文 / 英文名，如：霞鹜、微软雅黑">
         <label for="zh-font">中文字体 <span id="font-count"></span></label><select id="zh-font"><option value="">中文系统默认字体</option></select>
         <label for="ja-font">日文字体（含注音）</label><select id="ja-font"><option value="">日文系统默认字体</option></select>
         <div class="font-tools"><button id="scan-fonts" class="text-button">重新扫描</button><button id="coverage" class="text-button">检查缺字 ↗</button></div>
@@ -58,6 +58,35 @@
         <label for="margin">页边距 / mm</label><input id="margin" type="number" min="8" max="40" value="18">
         <label class="checkbox"><input type="checkbox" id="pageNumbers" checked>显示页码</label>
       </section>
+      <details class="setting-group decoration-settings" open>
+        <summary><span>04</span> 页眉文字</summary>
+        <label class="checkbox"><input id="headerEnabled" type="checkbox">启用页眉（每页重复）</label>
+        <fieldset id="header-fields" disabled>
+          <label for="headerText">页眉内容（支持换行）</label><textarea id="headerText" maxlength="2000" placeholder="例如：HITSZ 日语学习笔记"></textarea>
+          <label for="header-font">页眉字体</label><select id="header-font"><option value="">跟随中文字体</option></select>
+          <div class="range-setting"><label for="headerFontSize">字号 / pt</label><div class="range-pair"><input id="headerFontSize-range" type="range" data-number="headerFontSize" min="6" max="48" step="0.5" value="10" aria-label="页眉字号滑块"><input id="headerFontSize" type="number" min="6" max="48" step="0.5" value="10"></div></div>
+          <div class="range-setting"><label for="headerX">水平位置 / mm</label><div class="range-pair"><input id="headerX-range" type="range" data-number="headerX" min="0" max="210" step="0.5" value="18" aria-label="页眉水平位置滑块"><input id="headerX" type="number" min="0" max="210" step="0.5" value="18"></div></div>
+          <div class="range-setting"><label for="headerY">垂直位置 / mm</label><div class="range-pair"><input id="headerY-range" type="range" data-number="headerY" min="0" max="297" step="0.5" value="8" aria-label="页眉垂直位置滑块"><input id="headerY" type="number" min="0" max="297" step="0.5" value="8"></div></div>
+          <div class="two-columns"><div><label for="headerAlign">文本对齐</label><select id="headerAlign"><option value="left">左对齐</option><option value="center">居中</option><option value="right">右对齐</option></select></div><div><label for="headerColor">文字颜色</label><input id="headerColor" type="color" value="#69776e"></div></div>
+          <label class="checkbox"><input id="headerBold" type="checkbox">页眉加粗</label>
+          <div class="range-setting"><label for="headerExtraTop">正文上方额外留白 / mm</label><div class="range-pair"><input id="headerExtraTop-range" type="range" data-number="headerExtraTop" min="0" max="40" step="0.5" value="10" aria-label="页眉额外上边距滑块"><input id="headerExtraTop" type="number" min="0" max="40" step="0.5" value="10"></div></div>
+        </fieldset>
+        <p class="hint">位置为文本框左上角，文本框延伸至右页边距。有页眉文字时，每页正文上边距默认增加 10 mm；可用上方留白调整。</p>
+      </details>
+      <details class="setting-group decoration-settings" open>
+        <summary><span>05</span> 图片水印</summary>
+        <div class="watermark-file"><span id="watermark-name">未选择图片</span><img id="watermark-preview" alt="水印图片预览" hidden><div class="resource-actions"><button id="pick-watermark" class="secondary">上传水印</button><button id="clear-watermark" class="text-button" disabled>移除</button></div></div>
+        <input id="watermark-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <label class="checkbox"><input id="watermarkEnabled" type="checkbox" checked>显示水印（每页重复）</label>
+        <fieldset id="watermark-fields" disabled>
+          <div class="range-setting"><label for="watermarkX">水平位置 / mm</label><div class="range-pair"><input id="watermarkX-range" type="range" data-number="watermarkX" min="0" max="210" step="0.5" value="105" aria-label="水印水平位置滑块"><input id="watermarkX" type="number" min="0" max="210" step="0.5" value="105"></div></div>
+          <div class="range-setting"><label for="watermarkY">垂直位置 / mm</label><div class="range-pair"><input id="watermarkY-range" type="range" data-number="watermarkY" min="0" max="297" step="0.5" value="148.5" aria-label="水印垂直位置滑块"><input id="watermarkY" type="number" min="0" max="297" step="0.5" value="148.5"></div></div>
+          <div class="range-setting"><label for="watermarkWidth">图片宽度 / mm</label><div class="range-pair"><input id="watermarkWidth-range" type="range" data-number="watermarkWidth" min="5" max="210" step="0.5" value="60" aria-label="水印大小滑块"><input id="watermarkWidth" type="number" min="5" max="210" step="0.5" value="60"></div></div>
+          <div class="range-setting"><label for="watermarkOpacity">不透明度 / %</label><div class="range-pair"><input id="watermarkOpacity-range" type="range" data-number="watermarkOpacity" min="0" max="100" step="1" value="12" aria-label="水印不透明度滑块"><input id="watermarkOpacity" type="number" min="0" max="100" step="1" value="12"></div></div>
+          <button id="center-watermark" class="text-button">将水印居中</button>
+        </fieldset>
+        <p class="hint">位置为图片中心，均从纸张左上角计量；缩放保留原图比例，超出纸张的部分会裁切。推荐使用透明背景 PNG。</p>
+      </details>
       <section class="setting-group notices"><h3>文档检查</h3><ul id="warnings"><li>正在分析文档…</li></ul></section>
       <p class="privacy">本地服务 · 无 CDN · 无上传至云端<br>图片需手动导入，音视频转为文字提示</p>
     </aside>

@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import * as fontkit from 'fontkit';
+import { fontNames } from './font-names.js';
 
 let catalogue;
 export async function getFonts(refresh = false) {
@@ -34,7 +35,7 @@ async function scan() {
         const id = crypto.createHash('sha256').update(file + ':' + face.postscriptName).digest('hex').slice(0, 20);
         const weight = face['OS/2']?.usWeightClass || (/bold/i.test(face.subfamilyName) ? 700 : 400);
         fonts.set(id, { id, family: face.familyName || face.fullName, name: face.fullName, postscript: face.postscriptName,
-          weight, style: /italic|oblique/i.test(face.subfamilyName) ? 'italic' : 'normal', file });
+          weight, style: /italic|oblique/i.test(face.subfamilyName) ? 'italic' : 'normal', ...fontNames(face), file });
       }
     } catch { /* Skip unsupported or unreadable system fonts. */ }
   }
