@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MD Exporter · 把文字排成好看的纸页</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="MD Exporter 首页"><span class="logo">M<span>↓</span></span><span>MD Exporter<small>本地排版工作台</small></span></a>
+    <div class="header-end"><span class="local"><i></i> 文档在本机处理</span><button id="export" class="primary">导出 PDF <span>↗</span></button></div>
+  </header>
+  <main class="workspace">
+    <section class="editor-panel" aria-label="Markdown 编辑区">
+      <div class="panel-heading"><h1>文档</h1><span class="badge">MARKDOWN</span></div>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="导入 Markdown 文件">
+        <span class="upload-icon">↑</span><strong>放入你的 Markdown</strong><span>拖拽 .md 文件，或点击选择</span><small>UTF-8 · 支持 HTML 与日文注音</small>
+      </div>
+      <input id="file" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
+      <div class="file-row"><span id="filename" title="未保存示例">排版示例.md</span><button id="sample" class="text-button">载入示例</button></div>
+      <label class="sr-only" for="editor">Markdown 正文</label>
+      <textarea id="editor" spellcheck="false" placeholder="在这里粘贴 Markdown…"></textarea>
+      <div class="editor-footer"><span id="char-count">准备就绪</span><span>可直接编辑</span></div>
+      <div class="resources cover-tools"><div><strong>独立头图</strong><span id="cover-name">未选择</span></div><p>在文档顶部添加头图；开头已有独立图片时自动替换。</p><img id="cover-preview" alt="所选头图预览" hidden><div class="resource-actions"><button id="pick-cover" class="secondary">选择头图</button><button id="clear-cover" class="text-button" disabled>移除头图</button></div></div>
+      <input id="cover-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+      <div class="resources"><div><strong>配套图片</strong><span id="asset-count">尚未导入</span></div><p>导入 /image/ 等引用的原始图片，或选择包含它们的文件夹。</p><div class="resource-actions"><button id="pick-images" class="secondary">添加图片</button><button id="pick-folder" class="secondary">资源文件夹</button><button id="clear-assets" class="text-button">清空</button></div></div>
+      <input id="images" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+      <input id="folder" type="file" webkitdirectory multiple hidden>
+    </section>
+    <section class="preview-panel" aria-label="排版预览">
+      <div class="preview-toolbar"><div><span class="status-dot"></span><strong>排版预览</strong><span id="paper-label">A4 · 210 × 297 mm</span></div><button id="refresh" class="text-button">刷新预览 ↻</button></div>
+      <div class="preview-note">预览为连续纸张；PDF 会按所选纸张自动分页。</div>
+      <div class="preview-scroll"><iframe id="preview" title="Markdown 排版预览" sandbox="allow-same-origin"></iframe></div>
+      <div id="status" class="status" role="status" aria-live="polite">正在准备排版引擎…</div>
+    </section>
+    <aside class="settings-panel" aria-label="导出设置">
+      <div class="panel-heading"><h2>排版设置</h2><span class="settings-icon">☷</span></div>
+      <section class="setting-group"><h3><span>01</span> 字体</h3>
+        <label for="font-search">查找本机字体</label><input id="font-search" type="search" placeholder="搜索字体名称…">
+        <label for="zh-font">中文字体 <span id="font-count"></span></label><select id="zh-font"><option value="">中文系统默认字体</option></select>
+        <label for="ja-font">日文字体（含注音）</label><select id="ja-font"><option value="">日文系统默认字体</option></select>
+        <div class="font-tools"><button id="scan-fonts" class="text-button">重新扫描</button><button id="coverage" class="text-button">检查缺字 ↗</button></div>
+        <div id="coverage-result" class="hint">按中文、日文分别检查缺字，字体同时用于预览和 PDF。</div>
+        <p id="language-stats" class="hint">自动识别：中文译文 / 日文歌词与注音</p>
+        <p class="hint">按假名、ruby 和歌词结构识别。纯汉字可能有歧义，可在正文用 &lt;span lang="ja"&gt;…&lt;/span&gt; 或 lang="zh-CN" 手动指定。</p>
+        <label class="checkbox"><input type="checkbox" id="forceFont" checked>覆盖文档内指定的字体</label>
+      </section>
+      <section class="setting-group"><h3><span>02</span> 文字</h3>
+        <div class="two-columns"><div><label for="fontSize">字号 / pt</label><input id="fontSize" type="number" min="8" max="32" step="0.5" value="12"></div><div><label for="lineHeight">行距 / 倍</label><input id="lineHeight" type="number" min="1.4" max="3" step="0.1" value="2"></div></div>
+        <label for="rubySize">注音大小 <output id="ruby-value">50%</output></label><input id="rubySize" type="range" min="0.35" max="0.8" step="0.05" value="0.5">
+        <p class="hint">保留 ruby / rt 注音。较宽的行距可为假名留出空间。</p>
+      </section>
+      <section class="setting-group"><h3><span>03</span> 纸张</h3>
+        <label for="paper">纸张规格</label><select id="paper"><option value="A4">A4 · 210 × 297 mm</option><option value="A5">A5 · 148 × 210 mm</option><option value="Letter">Letter · 216 × 279 mm</option></select>
+        <label for="margin">页边距 / mm</label><input id="margin" type="number" min="8" max="40" value="18">
+        <label class="checkbox"><input type="checkbox" id="pageNumbers" checked>显示页码</label>
+      </section>
+      <section class="setting-group notices"><h3>文档检查</h3><ul id="warnings"><li>正在分析文档…</li></ul></section>
+      <p class="privacy">本地服务 · 无 CDN · 无上传至云端<br>图片需手动导入，音视频转为文字提示</p>
+    </aside>
+  </main>
+</body>
+</html>
