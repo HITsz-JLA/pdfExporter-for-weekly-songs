@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { chromium } from 'playwright-core';
 import { PDFDocument } from 'pdf-lib';
 import { escapeHtml, pageMargins, paperSize, settings } from './document.js';
+import { paginateWeeklyDocument } from './weekly.js';
 
 export function printHeader(options) {
   const s = settings(options);
@@ -51,21 +52,45 @@ async function browser() {
   return browserPromise;
 }
 let active = 0;
-export async function exportPdf(html, options, origin) {
+async function loadPage(context, html, origin) {
+  const page = await context.newPage();
+  page.setDefaultTimeout(30000);
+  await page.route('**/*', route => {
+    const url = new URL(route.request().url());
+    return url.origin === origin && /^\/api\/font\/[a-f0-9]{20}$/.test(url.pathname) ? route.continue() : route.abort();
+  });
+  await page.setContent(html, { waitUntil: 'networkidle', timeout: 30000 });
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all([...document.images].map(img => img.decode().catch(() => {})));
+  });
+  return page;
+}
+
+export async function prepareWeeklyPreview(html, origin) {
+  const context = await (await browser()).newContext({ javaScriptEnabled: false });
+  try {
+    const page = await loadPage(context, html, origin);
+    const pageCount = await page.evaluate(paginateWeeklyDocument);
+    return { html: await page.content(), pageCount };
+  } finally { await context.close(); }
+}
+
+export async function exportPdf(html, options, origin, { weeklySong = false } = {}) {
   if (active >= 2) { const error = new Error('当前正在导出其他文档，请稍后重试。'); error.status = 429; throw error; }
   active++;
   let context;
   try {
     const b = await browser();
     context = await b.newContext({ javaScriptEnabled: false });
-    const page = await context.newPage();
-    page.setDefaultTimeout(30000);
-    await page.route('**/*', route => {
-      const url = new URL(route.request().url());
-      return url.origin === origin && /^\/api\/font\/[a-f0-9]{20}$/.test(url.pathname) ? route.continue() : route.abort();
-    });
-    await page.setContent(html, { waitUntil: 'networkidle', timeout: 30000 });
-    await page.evaluate(async () => { await document.fonts.ready; });
+    const page = await loadPage(context, html, origin);
+    if (weeklySong) {
+      try {
+        await page.evaluate(async () => { for (const img of document.querySelectorAll('img.page-watermark')) await img.decode(); });
+      } catch { const error = new Error('水印图片无法读取，请重新上传有效图片。'); error.status = 400; throw error; }
+      await page.evaluate(paginateWeeklyDocument);
+      return await page.pdf({ format: options.paper, margin: { top: 0, bottom: 0, left: 0, right: 0 }, printBackground: true, preferCSSPageSize: true, displayHeaderFooter: false, timeout: 30000 });
+    }
     let watermark;
     if (options.watermarkEnabled && options.watermarkOpacity > 0) {
       try {
@@ -87,7 +112,8 @@ export async function exportPdf(html, options, origin) {
     const margins = Object.fromEntries(Object.entries(pageMargins(options)).map(([side, value]) => [side, `${value}mm`]));
     const bytes = await page.pdf({ format: options.paper, margin: margins,
       printBackground: true, preferCSSPageSize: true, displayHeaderFooter: options.pageNumbers || (options.headerEnabled && Boolean(options.headerText.trim())),
-      headerTemplate: printHeader(options), footerTemplate: options.pageNumbers ? '<div style="width:100%;text-align:center;font:9px Arial;color:#888"><span class="pageNumber"></span> / <span class="totalPages"></span></div>' : '<span></span>', timeout: 30000 });
+      headerTemplate: printHeader(options),
+      footerTemplate: options.pageNumbers ? '<div style="width:100%;text-align:center;font:9px Arial;color:#888"><span class="pageNumber"></span> / <span class="totalPages"></span></div>' : '<span></span>', timeout: 30000 });
     return await addWatermark(bytes, watermark, options);
   } finally { await context?.close(); active--; }
 }

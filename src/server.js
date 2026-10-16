@@ -3,7 +3,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getFonts, publicFont, coverage } from './fonts.js';
 import { parseDocument, buildHtml, settings } from './document.js';
-import { exportPdf, browserPath, closeBrowser } from './pdf.js';
+import { exportPdf, browserPath, closeBrowser, prepareWeeklyPreview } from './pdf.js';
+import { isWeeklySong } from './weekly.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const app = express();
@@ -40,21 +41,33 @@ async function prepare(body, origin) {
       || Object.values(body.assets).some(value => typeof value !== 'string'))) {
     const error = new Error('图片资源格式不正确。'); error.status = 400; throw error;
   }
-  const options = settings(body.options);
+  const options = settings({ ...body.options, sourceName: body.sourceName || body.options?.sourceName || '' });
   const fonts = await getFonts();
-  const selected = { zh: fonts.get(options.zhFontId), ja: fonts.get(options.jaFontId), header: fonts.get(options.headerFontId || options.zhFontId) };
+  const selected = { zh: fonts.get(options.zhFontId), ja: fonts.get(options.jaFontId), header: fonts.get(options.headerFontId) };
   if ((options.zhFontId && !selected.zh) || (options.jaFontId && !selected.ja) || (options.headerFontId && !selected.header)) { const error = new Error('所选字体已不存在，请刷新字体列表。'); error.status = 400; throw error; }
-  const faces = Object.fromEntries(['zh', 'ja', 'header'].map(lang => [lang, selected[lang] ? [...fonts.values()].filter(f => f.family === selected[lang].family) : []]));
   // Chromium's native header uses installed font families, independently of the document CSS.
-  options.headerFontFamily = selected.header?.family || 'Microsoft YaHei';
   if (body.coverImage !== undefined && typeof body.coverImage !== 'string') { const error = new Error('头图格式不正确。'); error.status = 400; throw error; }
   if (body.watermarkImage !== undefined && typeof body.watermarkImage !== 'string') { const error = new Error('水印图片格式不正确。'); error.status = 400; throw error; }
   const doc = parseDocument(body.markdown, body.assets || {}, { coverImage: body.coverImage || '', watermarkImage: body.watermarkImage || '' });
+  const weekly = isWeeklySong(doc, options);
+  if (!selected.header && !weekly) selected.header = selected.zh;
+  options.headerFontFamily = selected.header?.family || 'Microsoft YaHei';
+  const defaults = { running: 'YouYuan', latin: 'Arial Rounded MT Bold' };
+  const faces = Object.fromEntries(['zh', 'ja', 'header', 'running', 'latin'].map(lang => {
+    const family = selected[lang]?.family || (weekly && defaults[lang]);
+    return [lang, family ? [...fonts.values()].filter(f => f.family === family) : []];
+  }));
   return { doc, options, selected, html: buildHtml(doc, options, faces, origin) };
 }
 app.post('/api/preview', async (req, res) => {
-  const result = await prepare(req.body, '');
-  res.json({ html: result.html, title: result.doc.title, warnings: result.doc.warnings, characters: [...result.doc.text].length, languageStats: result.doc.languageStats });
+  const address = req.socket.localAddress?.includes(':') ? `[${req.socket.localAddress}]` : req.socket.localAddress;
+  const origin = `http://${address}:${req.socket.localPort}`;
+  const result = await prepare(req.body, origin);
+  const preview = isWeeklySong(result.doc, result.options) ? await prepareWeeklyPreview(result.html, origin) : { html: result.html };
+  // The browser may reach us via localhost, a hostname or a LAN address. Keep
+  // preview font URLs relative to that origin (and its CSP), after measurement.
+  preview.html = preview.html.replaceAll(`${origin}/api/font/`, '/api/font/');
+  res.json({ ...preview, title: result.doc.title, warnings: result.doc.warnings, characters: [...result.doc.text].length, languageStats: result.doc.languageStats });
 });
 app.post('/api/coverage', async (req, res) => {
   const result = await prepare(req.body, '');
@@ -73,7 +86,8 @@ app.post('/api/export', async (req, res) => {
   const address = req.socket.localAddress?.includes(':') ? `[${req.socket.localAddress}]` : req.socket.localAddress;
   const origin = `http://${address}:${req.socket.localPort}`;
   const result = await prepare(req.body, origin);
-  const pdf = await exportPdf(result.html, result.options, origin);
+  const weeklySong = isWeeklySong(result.doc, result.options);
+  const pdf = await exportPdf(result.html, result.options, origin, { weeklySong });
   const filename = result.doc.title.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 100) || 'document';
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="document.pdf"; filename*=UTF-8''${encodeURIComponent(filename)}.pdf`);

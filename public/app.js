@@ -44,13 +44,15 @@ let coverImage = '';
 let watermarkImage = '';
 let fonts = [];
 let title = '日文注音 · 排版示例';
+let sourceName = '';
 let timer;
 let previewSequence = 0;
 let coverageSequence = 0;
-const optionIds = ['zh-font', 'ja-font', 'fontSize', 'lineHeight', 'margin', 'rubySize', 'paper', 'pageNumbers', 'forceFont',
+const optionIds = ['theme', 'zh-font', 'ja-font', 'fontSize', 'lineHeight', 'margin', 'rubySize', 'paper', 'pageNumbers', 'forceFont',
   'headerEnabled', 'headerText', 'header-font', 'headerAlign', 'headerColor', 'headerBold', 'watermarkEnabled'];
 function payload() {
-  return { markdown: $('editor').value, assets, coverImage, watermarkImage, options: {
+  return { markdown: $('editor').value, sourceName, assets, coverImage, watermarkImage, options: {
+    theme: $('theme').value,
     zhFontId: $('zh-font').value, jaFontId: $('ja-font').value, fontSize: Number($('fontSize').value), lineHeight: Number($('lineHeight').value),
     margin: Number($('margin').value), rubySize: Number($('rubySize').value), paper: $('paper').value,
     pageNumbers: $('pageNumbers').checked, forceFont: $('forceFont').checked,
@@ -93,7 +95,7 @@ async function preview() {
     $('warnings').replaceChildren(...(result.warnings.length ? result.warnings : ['格式检查通过，可导出 PDF。']).map(text => {
       const li = document.createElement('li'); li.textContent = text; return li;
     }));
-    status('预览已更新 · 自动分页结果以 PDF 为准');
+    status(result.pageCount ? `预览已更新 · 每周一曲 · 共 ${result.pageCount} 页` : '预览已更新 · 自动分页结果以 PDF 为准');
   } catch (error) { if (sequence === previewSequence) status(error.message, true); }
 }
 function showFonts() {
@@ -103,7 +105,7 @@ function showFonts() {
     const previous = families.get(f.family);
     if (!previous || (f.style === 'normal' && Math.abs(f.weight - 400) < Math.abs(previous.weight - 400))) families.set(f.family, f);
   }
-  for (const [id, label] of [['zh-font', '中文系统默认字体'], ['ja-font', '日文系统默认字体'], ['header-font', '跟随中文字体']]) {
+  for (const [id, label] of [['zh-font', '中文系统默认字体'], ['ja-font', '日文系统默认字体'], ['header-font', '主题默认 / 普通版跟随中文字体']]) {
     const old = $(id).value;
     const visible = [...families.values()].filter(f => terms.every(term => (f.searchNames || [f.family, f.name]).join(' ').normalize('NFKC').toLowerCase().includes(term)) || f.id === old);
     const groups = (id === 'ja-font' ? ['ja', 'zh', 'other'] : ['zh', 'ja', 'other']).map(category => {
@@ -127,8 +129,8 @@ async function loadFonts(refresh = false) {
   try {
     fonts = (await (await api('/api/fonts' + (refresh ? '?refresh=1' : ''))).json()).fonts;
     showFonts();
-    if (!refresh) for (const [id, pattern] of [['zh-font', /^(Microsoft YaHei|微软雅黑|Noto Sans CJK SC)$/i], ['ja-font', /^(Yu Gothic|游ゴシック|Meiryo|Noto Sans CJK JP)$/i]]) {
-      const preferred = fonts.find(f => pattern.test(f.family) && f.weight === 400 && f.style === 'normal');
+    if (!refresh) for (const [id, patterns] of [['zh-font', [/^(Microsoft YaHei|微软雅黑)$/i, /^Noto Sans CJK SC$/i]], ['ja-font', [/^Meiryo$/i, /^(Yu Gothic|游ゴシック|Noto Sans CJK JP)$/i]]]) {
+      const preferred = patterns.map(pattern => fonts.find(f => pattern.test(f.family) && f.weight === 400 && f.style === 'normal')).find(Boolean);
       if (preferred && !$(id).value) $(id).value = preferred.id;
     }
     invalidateCoverage();
@@ -142,6 +144,7 @@ async function readMarkdown(file) {
   try {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
     assets = Object.create(null); updateAssetCount(); setCover('');
+    sourceName = file.name;
     $('editor').value = text; $('filename').textContent = file.name; $('filename').title = file.name;
     invalidateCoverage(); await preview();
   } catch (error) { status('无法导入，请确认文档使用 UTF-8 编码：' + error.message, true); }
@@ -213,7 +216,7 @@ $('paper').addEventListener('input', updatePageLimits);
 $('headerEnabled').addEventListener('input', updateDecorationControls);
 $('watermarkEnabled').addEventListener('input', updateDecorationControls);
 $('refresh').onclick = preview;
-$('sample').onclick = () => { $('editor').value = sample; $('filename').textContent = '排版示例.md'; assets = Object.create(null); updateAssetCount(); setCover(''); invalidateCoverage(); preview(); };
+$('sample').onclick = () => { sourceName = ''; $('editor').value = sample; $('filename').textContent = '排版示例.md'; assets = Object.create(null); updateAssetCount(); setCover(''); invalidateCoverage(); preview(); };
 $('dropzone').onclick = () => $('file').click();
 $('dropzone').onkeydown = event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); $('file').click(); } };
 $('file').onchange = event => { if (event.target.files[0]) readMarkdown(event.target.files[0]); event.target.value = ''; };

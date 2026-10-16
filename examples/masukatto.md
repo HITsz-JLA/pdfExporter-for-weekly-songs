@@ -3,6 +3,7 @@ title: "マスカット - 平原綾香"
 date: 2026-10-15
 draft: false
 type: lyrics
+weekly_url: "http://jpa.guramod.club/lyrics/masukatto/"
 ---
 
 ![专辑封面](/image/Masukatto.jpg)
@@ -45,7 +46,7 @@ type: lyrics
 
 已经无所畏惧
 
-**この<ruby>実<rt>み</rt></ruby>はあなたの<ruby>モノ<rt>もの</rt></ruby>**
+**この<ruby>実<rt>み</rt></ruby>はあなたのモノ**
 
 这颗果实是你的
 

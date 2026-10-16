@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it';
 import sanitizeHtml from 'sanitize-html';
 import { parse as parseYaml } from 'yaml';
 import { annotateLanguages, withCover } from './language.js';
+import { buildWeeklyHtml, exampleImage, isWeeklySong, removeRedundantRuby } from './weekly.js';
 
 const md = new MarkdownIt({ html: true, linkify: true, breaks: true, typographer: false });
 export const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -12,7 +13,9 @@ export const paperSize = paper => paper === 'A5' ? [148, 210] : paper === 'Lette
 export function settings(input = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) input = {};
   const [width, height] = paperSize(input.paper);
-  return { paper: ['A4', 'A5', 'Letter'].includes(input.paper) ? input.paper : 'A4',
+  return { theme: ['auto', 'weekly', 'plain'].includes(input.theme) ? input.theme : 'auto',
+    sourceName: typeof input.sourceName === 'string' ? input.sourceName.slice(0, 200) : '',
+    paper: ['A4', 'A5', 'Letter'].includes(input.paper) ? input.paper : 'A4',
     fontSize: number(input.fontSize, 12, 8, 32), lineHeight: number(input.lineHeight, 2, 1.4, 3),
     margin: number(input.margin, 18, 8, 40), rubySize: number(input.rubySize, 0.5, 0.35, 0.8),
     fontId: typeof input.fontId === 'string' ? input.fontId : '',
@@ -62,6 +65,7 @@ export function parseDocument(source, assets = {}, { coverImage = '', watermarkI
     let matches = entries.filter(([name]) => cleanPath(name) === key || cleanPath(name).endsWith('/' + key));
     if (!matches.length) matches = entries.filter(([name]) => cleanPath(name).split('/').pop() === key.split('/').pop());
     if (matches.length === 1 && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z\d+/=\s]+$/i.test(matches[0][1])) return matches[0][1];
+    if (!matches.length && exampleImage(src)) return exampleImage(src);
     warnings.add(`图片${matches.length > 1 ? '匹配到多个文件' : '未提供'}：${src}。请导入对应图片或资源文件夹。`);
     return null;
   };
@@ -86,12 +90,13 @@ export function parseDocument(source, assets = {}, { coverImage = '', watermarkI
     }
   });
   const text = md.utils.unescapeAll(sanitizeHtml(html.replace(/<rt[^>]*>/g, ' '), { allowedTags: [], allowedAttributes: {} }));
-  const annotated = annotateLanguages(html, { lyrics: meta.type === 'lyrics' });
+  const annotated = annotateLanguages(meta.type === 'lyrics' ? removeRedundantRuby(html) : html, { lyrics: meta.type === 'lyrics' });
   return { ...annotated, watermarkImage, text, title: typeof meta.title === 'string' ? meta.title : 'Markdown 文档', warnings: [...warnings], meta };
 }
 
 export function buildHtml(doc, options, faces = [], origin = '') {
   const s = settings(options);
+  if (isWeeklySong(doc, s)) return buildWeeklyHtml(doc, s, Array.isArray(faces) ? { zh: faces, ja: faces } : faces, origin, s.sourceName);
   const mm = paperSize(s.paper);
   const margins = pageMargins(s);
   const marginCss = margins.top === s.margin ? `${s.margin}mm` : `${margins.top}mm ${s.margin}mm ${s.margin}mm ${s.margin}mm`;

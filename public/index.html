@@ -32,7 +32,7 @@
     </section>
     <section class="preview-panel" aria-label="排版预览">
       <div class="preview-toolbar"><div><span class="status-dot"></span><strong>排版预览</strong><span id="paper-label">A4 · 210 × 297 mm</span></div><button id="refresh" class="text-button">刷新预览 ↻</button></div>
-      <div class="preview-note">连续预览仅展示首页页眉 / 水印位置；PDF 自动分页并在每页重复。</div>
+      <div class="preview-note">每周一曲展示完整分页预览；普通版为连续预览，导出时每页重复页眉与水印。</div>
       <div class="preview-scroll"><iframe id="preview" title="Markdown 排版预览" sandbox="allow-same-origin"></iframe></div>
       <div id="status" class="status" role="status" aria-live="polite">正在准备排版引擎…</div>
     </section>
@@ -54,16 +54,18 @@
         <p class="hint">保留 ruby / rt 注音。较宽的行距可为假名留出空间。</p>
       </section>
       <section class="setting-group"><h3><span>03</span> 纸张</h3>
+        <label for="theme">排版样式</label><select id="theme"><option value="auto">自动识别（type: lyrics 使用每周一曲）</option><option value="weekly">每周一曲 · 日语社</option><option value="plain">普通 Markdown · 白底</option></select>
         <label for="paper">纸张规格</label><select id="paper"><option value="A4">A4 · 210 × 297 mm</option><option value="A5">A5 · 148 × 210 mm</option><option value="Letter">Letter · 216 × 279 mm</option></select>
         <label for="margin">页边距 / mm</label><input id="margin" type="number" min="8" max="40" value="18">
         <label class="checkbox"><input type="checkbox" id="pageNumbers" checked>显示页码</label>
+        <p class="hint">每周一曲默认参数对应《マスカット》成品：米色纸面、竹席边框、封面和社徽贴纸。字号 12 / 行距 2 / 边距 18 / 注音 50% / A4；边距调节相对模板基准作用于正文左右。</p>
       </section>
       <details class="setting-group decoration-settings" open>
         <summary><span>04</span> 页眉文字</summary>
         <label class="checkbox"><input id="headerEnabled" type="checkbox">启用页眉（每页重复）</label>
         <fieldset id="header-fields" disabled>
           <label for="headerText">页眉内容（支持换行）</label><textarea id="headerText" maxlength="2000" placeholder="例如：HITSZ 日语学习笔记"></textarea>
-          <label for="header-font">页眉字体</label><select id="header-font"><option value="">跟随中文字体</option></select>
+          <label for="header-font">页眉字体</label><select id="header-font"><option value="">主题默认 / 普通版跟随中文字体</option></select>
           <div class="range-setting"><label for="headerFontSize">字号 / pt</label><div class="range-pair"><input id="headerFontSize-range" type="range" data-number="headerFontSize" min="6" max="48" step="0.5" value="10" aria-label="页眉字号滑块"><input id="headerFontSize" type="number" min="6" max="48" step="0.5" value="10"></div></div>
           <div class="range-setting"><label for="headerX">水平位置 / mm</label><div class="range-pair"><input id="headerX-range" type="range" data-number="headerX" min="0" max="210" step="0.5" value="18" aria-label="页眉水平位置滑块"><input id="headerX" type="number" min="0" max="210" step="0.5" value="18"></div></div>
           <div class="range-setting"><label for="headerY">垂直位置 / mm</label><div class="range-pair"><input id="headerY-range" type="range" data-number="headerY" min="0" max="297" step="0.5" value="8" aria-label="页眉垂直位置滑块"><input id="headerY" type="number" min="0" max="297" step="0.5" value="8"></div></div>
